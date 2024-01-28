@@ -1,5 +1,6 @@
 use std::env;
 use std::{collections::HashMap, fs, io::Write};
+use std::time::{self, Instant};
 
 const TXT_DIR: &str = "txt_dir";
 const HASH_DIR: &str = "hash_dir";
@@ -9,7 +10,6 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     if args.len() == 1 {
-        // text_vec = vec!["Shakespeare.txt", "Moby_Dick.txt", "WikiQA-train.txt"];
         text_vec.append(&mut grab_txts_from_dir(TXT_DIR));
     } else {
         for arg in &args[1..] {
@@ -17,6 +17,7 @@ fn main() {
         }
     }
     for text in text_vec {
+        let now = Instant::now();
         match fs::read_to_string(format!("{}/{}",TXT_DIR,&text)) {
             Ok(file_text) => {
                 let name = text.replace(".txt", "_hash.txt");
@@ -27,6 +28,8 @@ fn main() {
                 println!("{text} doesn't exist")
             }
         }
+        let elapsed_time = now.elapsed();
+        println!("{} took {}ms to parse, count, and sort", text, elapsed_time.as_millis());
     }
 }
 
