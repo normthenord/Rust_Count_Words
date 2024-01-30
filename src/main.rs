@@ -1,6 +1,10 @@
 use std::env;
+use std::thread;
+use std::thread::sleep;
+use std::thread::JoinHandle;
+use std::time::Duration;
+use std::time::Instant;
 use std::{collections::HashMap, fs, io::Write};
-use std::time::{self, Instant};
 
 const TXT_DIR: &str = "txt_dir";
 const HASH_DIR: &str = "hash_dir";
@@ -16,29 +20,47 @@ fn main() {
             text_vec.push(arg.to_string());
         }
     }
+
+    let mut handles = vec![];
+
     for text in text_vec {
-        let now = Instant::now();
-        match fs::read_to_string(format!("{}/{}",TXT_DIR,&text)) {
-            Ok(file_text) => {
-                let name = text.replace(".txt", "_hash.txt");
-                let text_map = create_text_map(file_text);
-                sort_text_map(text_map, name);
-            }
-            Err(_) => {
-                println!("{text} doesn't exist")
-            }
+        let handle = thread::spawn(|| {
+            // println!("Starting thread {text}");
+            start_parsing(text);});
+        handles.push(handle);
+    }
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    // sleep(Duration::from_secs(10));
+}
+
+fn start_parsing(text: String) {
+    
+    let now = Instant::now();
+    // println!("{text}");
+    match fs::read_to_string(format!("{}/{}", TXT_DIR, &text)) {
+        Ok(file_text) => {
+            let name = text.replace(".txt", "_hash.txt");
+            let text_map = create_text_map(file_text);
+            sort_text_map(text_map, name);
+            let elapsed_time = now.elapsed();
+            println!(
+                "{} took {}ms to parse, count, and sort",
+                text,
+                elapsed_time.as_millis()
+            );
         }
-        let elapsed_time = now.elapsed();
-        println!("{} took {}ms to parse, count, and sort", text, elapsed_time.as_millis());
+        Err(_) => {
+            println!("{text} doesn't exist")
+        }
     }
 }
 
 fn grab_txts_from_dir(dir: &str) -> Vec<String> {
-    // vec!["Shakespeare.txt", "Moby_Dick.txt", "WikiQA-train.txt"]
     let mut txt_vec: Vec<String> = Vec::new();
     let paths = fs::read_dir(dir).unwrap();
     for path in paths {
-        // let txt_path = format!("{TXT_DIR}/{}", path.unwrap().file_name().into_string().unwrap());
         txt_vec.push(path.unwrap().file_name().into_string().unwrap());
     }
     txt_vec
