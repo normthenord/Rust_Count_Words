@@ -1,0 +1,1 @@
+A simple Rust program to prase, count, and sort a plain .txt file.

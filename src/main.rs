@@ -1,13 +1,17 @@
 use std::env;
 use std::thread;
-use std::thread::sleep;
-use std::thread::JoinHandle;
-use std::time::Duration;
 use std::time::Instant;
 use std::{collections::HashMap, fs, io::Write};
 
 const TXT_DIR: &str = "txt_dir";
 const HASH_DIR: &str = "hash_dir";
+
+struct ParseResult {
+    text: String,
+    elapsed_time: u128,
+    unique_words: usize,
+    total_words: u32,
+}
 
 fn main() {
     let mut text_vec: Vec<String> = Vec::new();
@@ -24,35 +28,47 @@ fn main() {
     let mut handles = vec![];
 
     for text in text_vec {
-        let handle = thread::spawn(|| {
-            // println!("Starting thread {text}");
-            start_parsing(text);});
+        let handle = thread::spawn(|| start_parsing(text));
         handles.push(handle);
     }
+    let mut result_vec = vec![];
     for handle in handles {
-        handle.join().unwrap();
+        let result = handle.join().unwrap();
+        match result {
+            Ok(response) => result_vec.push(response),
+            Err(s) => {
+                println!("{s}");
+            }
+        }
     }
-    // sleep(Duration::from_secs(10));
+    result_vec.sort_by(|a, b| a.elapsed_time.cmp(&b.elapsed_time));
+    for result in result_vec {
+        println!("{} took {}ms to parse, count, and sort -- It includes {} unique words and {} total words", 
+        result.text, 
+        result.elapsed_time, 
+        result.unique_words, 
+        result.total_words)
+    }
 }
 
-fn start_parsing(text: String) {
-    
+fn start_parsing(text: String) -> Result<ParseResult, String> {
     let now = Instant::now();
-    // println!("{text}");
     match fs::read_to_string(format!("{}/{}", TXT_DIR, &text)) {
         Ok(file_text) => {
             let name = text.replace(".txt", "_hash.txt");
             let text_map = create_text_map(file_text);
-            sort_text_map(text_map, name);
-            let elapsed_time = now.elapsed();
-            println!(
-                "{} took {}ms to parse, count, and sort",
+            sort_text_map(&text_map, name);
+            let result = ParseResult {
                 text,
-                elapsed_time.as_millis()
-            );
+                elapsed_time: now.elapsed().as_millis(),
+                unique_words: text_map.iter().count(),
+                total_words: text_map.iter().map(|(_x, y)| y).sum::<u32>(),
+            };
+            return Ok(result);
         }
         Err(_) => {
-            println!("{text} doesn't exist")
+            println!("{text} doesn't exist");
+            Err("Text doesn't exist".to_owned())
         }
     }
 }
@@ -86,7 +102,7 @@ fn create_text_map(file_text: String) -> HashMap<String, u32> {
     text_map
 }
 
-fn sort_text_map(text_map: HashMap<String, u32>, name: String) {
+fn sort_text_map(text_map: &HashMap<String, u32>, name: String) {
     let mut count_vec: Vec<(&String, &u32)> = text_map.iter().collect();
 
     count_vec.sort_unstable_by(|a, b| b.1.cmp(a.1));
@@ -101,6 +117,5 @@ fn write_hashmap(count_vec: Vec<(&String, &u32)>, name: String) {
     for word in count_vec {
         s = s + &format!("{}: {}\n", word.0, word.1);
     }
-
     new_file.write_all(s.as_bytes()).unwrap();
 }
